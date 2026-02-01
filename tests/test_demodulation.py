@@ -72,7 +72,8 @@ def test_qpsk_known_demapping():
         1 + 1j,
         -1 + 1j,
         -1 - 1j,
-        1 - 1j], dtype=np.complex128) / np.sqrt(2)
+        1 - 1j,
+    ], dtype=np.complex128) / np.sqrt(2)
 
     bits = qpsk_demodulation(symbols)
 

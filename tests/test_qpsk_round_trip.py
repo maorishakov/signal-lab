@@ -8,6 +8,7 @@ from signal_lab.demodulation import qpsk_demodulation
 def test_qpsk_round_trip_no_noise():
     rng = np.random.default_rng(seed=42)
 
+    # מספר זוגי של ביטים (חובה ל-QPSK)
     num_bits = 1000
     bits_tx = rng.integers(0, 2, size=num_bits, dtype=np.uint8)
 
