@@ -20,7 +20,7 @@ def qpsk_demodulation(symbols: np.ndarray) -> np.ndarray:
         raise ValueError("symbols must be a 1D array")
 
     if not np.all(np.isfinite(symbols)):
-        raise  ValueError("symbols contains INF or NaN values")
+        raise ValueError("symbols contains INF or NaN values")
 
     Inphase = symbols.real
     Quadrature = symbols.imag
