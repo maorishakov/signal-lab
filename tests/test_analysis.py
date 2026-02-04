@@ -1,7 +1,7 @@
 import numpy as np
 import pytest
 
-from signal_lab.analysis import power, spectrum, dominant_freq
+from signal_lab.analysis import power, spectrum, dominant_freq, spectrogram
 
 
 def test_power_ones_is_one():
@@ -55,3 +55,86 @@ def test_dominant_freq_shape_mismatch_raises():
     psd_db = np.zeros(7)
     with pytest.raises(ValueError):
         dominant_freq(f, psd_db)
+
+
+def test_spectrogram_shapes_and_axes():
+    rng = np.random.default_rng(0)
+    N = 4096
+    nfft = 256
+    hop = 128
+
+    iq = rng.normal(size=N) + 1j * rng.normal(size=N)
+
+    t, f, S_db = spectrogram(iq, nfft=nfft, hop=hop, window="hann")
+
+    num_frames = 1 + (N - nfft) // hop
+
+    assert t.shape == (num_frames,)
+    assert f.shape == (nfft,)
+    assert S_db.shape == (num_frames, nfft)
+
+    # frequency axis should be normalized [-0.5, 0.5)
+    assert np.isclose(f[0], -0.5)
+    assert np.isclose(f[-1], 0.5 - 1 / nfft)
+
+
+def test_spectrogram_tone_peak_frequency_is_correct_across_frames():
+    N = 4096
+    nfft = 256
+    hop = 128
+    f0 = 0.12  # normalized cycles/sample
+
+    n = np.arange(N)
+    iq = np.exp(1j * 2 * np.pi * f0 * n).astype(np.complex128)
+
+    t, f, S_db = spectrogram(iq, nfft=nfft, hop=hop, window="hann")
+
+    # For each frame, find the frequency bin of the maximum
+    peak_bins = np.argmax(S_db, axis=1)
+    peak_freqs = f[peak_bins]
+
+    # FFT bin spacing
+    df = 1.0 / nfft
+
+    # Most frames should identify a peak close to f0 (within ~1 bin)
+    assert np.mean(np.abs(peak_freqs - f0) <= df) > 0.9
+
+
+def test_spectrogram_invalid_non_complex_raises():
+    iq = np.ones(1024, dtype=np.float64)
+    with pytest.raises(ValueError):
+        spectrogram(iq, nfft=256, hop=128, window="hann")
+
+
+def test_spectrogram_invalid_non_1d_raises():
+    iq = np.ones((256, 4), dtype=np.complex128)
+    with pytest.raises(ValueError):
+        spectrogram(iq, nfft=256, hop=128, window="hann")
+
+
+def test_spectrogram_non_finite_raises():
+    iq = np.array([1 + 1j, np.nan + 1j], dtype=np.complex128)
+    with pytest.raises(ValueError):
+        spectrogram(iq, nfft=4, hop=2, window="hann")
+
+
+def test_spectrogram_nfft_too_large_raises():
+    iq = np.ones(100, dtype=np.complex128)
+    with pytest.raises(ValueError):
+        spectrogram(iq, nfft=256, hop=128, window="hann")
+
+
+def test_spectrogram_invalid_hop_raises():
+    iq = np.ones(1024, dtype=np.complex128)
+
+    with pytest.raises(ValueError):
+        spectrogram(iq, nfft=256, hop=0, window="hann")
+
+    with pytest.raises(ValueError):
+        spectrogram(iq, nfft=256, hop=300, window="hann")  # hop > nfft
+
+
+def test_spectrogram_invalid_window_raises():
+    iq = np.ones(1024, dtype=np.complex128)
+    with pytest.raises(ValueError):
+        spectrogram(iq, nfft=256, hop=128, window="blackman")
