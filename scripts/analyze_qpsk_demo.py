@@ -1,27 +1,21 @@
 import numpy as np
 import matplotlib.pyplot as plt
 
+from signal_lab.modulation import qpsk_modulation
 from signal_lab.analysis import power
 from signal_lab.analysis import spectrum
-from signal_lab.analysis import dominant_freq
 from signal_lab.analysis import spectrogram
 from signal_lab.channel import awgn_channel
 
 """
-“Tone IQ (clean) → AWGN Channel → Analysis (power, spectrum, dominant_freq, spectrogram) → Plot PSD (clean vs noisy)”
-
-n = samples_vector
-ϕ[n]= 2π * f0 * n
-x[n]= e ^ jϕ[n]
-
+bits → QPSK → AWGN → Analysis (power / spectrum / spectrogram) → plots + prints
 """
 
 SEED = 968
-N = 4096
+N_BITS = 200000
 NFFT = 4096
 WINDOW = "hann"
 # Tone frequency
-F0 = 0.12
 SNR_DB = 5
 SPEC_NFFT = 256
 SPEC_HOP = 128
@@ -29,46 +23,38 @@ SPEC_HOP = 128
 
 def main():
     rng = np.random.default_rng(SEED)
-    samples_vector = np.arange(N)
-    phase = 2 * np.pi * F0 * samples_vector
-    iq_clean = np.exp(1j * phase)
-
+    bits = rng.integers(0, 2, N_BITS, dtype=np.uint8)
+    iq_clean = qpsk_modulation(bits)
     iq_noisy = awgn_channel(iq_clean, SNR_DB, rng=rng)
 
-    # analysis for iq_clean:
-    power_iq_clean = power(iq_clean)
-    f_iq_clean, psd_iq_clean = spectrum(iq_clean, NFFT, WINDOW)
-    dominant_freq_iq_clean = dominant_freq(f_iq_clean, psd_iq_clean)
+    p_clean = power(iq_clean)
+    p_noisy = power(iq_noisy)
+    p_noise = power(iq_noisy - iq_clean)
+    snr_measured_db = 10 * np.log10(p_clean / p_noise)
+    print(f"power clean: {p_clean:.6f}")
+    print(f"power noisy: {p_noisy:.6f}")
+    print(f"power noise: {p_noise:.6f}")
+    print(f"measured SNR: {snr_measured_db:.2f} dB")
 
-    # analysis for iq_noisy:
-    power_iq_noisy = power(iq_noisy)
-    f_iq_noisy, psd_iq_noisy = spectrum(iq_noisy, NFFT, WINDOW)
-    dominant_freq_iq_noisy = dominant_freq(f_iq_noisy, psd_iq_noisy)
-
-    print("dominant freq iq clean: " + f"{dominant_freq_iq_clean}")
-    print("dominant freq iq noisy: " + f"{dominant_freq_iq_noisy}")
-    print(f"power clean: {power_iq_clean}")
-    print(f"power noisy: {power_iq_noisy}")
-    print(f"power noise: {power(iq_noisy - iq_clean)}")
+    f_clean, psd_clean = spectrum(iq_clean, nfft=NFFT, window=WINDOW)
+    f_noisy, psd_noisy = spectrum(iq_noisy, nfft=NFFT, window=WINDOW)
 
     # plot
     plt.figure()
-    plt.plot(f_iq_clean, psd_iq_clean, label="clean")
-    plt.plot(f_iq_noisy, psd_iq_noisy, label="noisy")
+    plt.plot(f_clean, psd_clean, label="clean")
+    plt.plot(f_noisy, psd_noisy, label=f"noisy (SNR={SNR_DB} dB)")
     plt.xlabel("Frequency")
     plt.ylabel("PSD [dB]")
-    plt.title("PSD vs Frequency single Tone")
+    plt.title("PSD vs Frequency (QPSK)")
     plt.grid(True, which="both")
     plt.legend()
     plt.show()
 
     # spectrogram
 
-    t_clean, f_clean, S_db_clean = spectrogram(iq_clean, SPEC_NFFT, SPEC_HOP, WINDOW)
-    t_noisy, f_noisy, S_db_noisy = spectrogram(iq_noisy, SPEC_NFFT, SPEC_HOP, WINDOW)
+    t_clean, f_clean, S_db_clean = spectrogram(iq_clean, nfft=SPEC_NFFT, hop=SPEC_HOP, window=WINDOW)
+    t_noisy, f_noisy, S_db_noisy = spectrogram(iq_noisy, nfft=SPEC_NFFT, hop=SPEC_HOP, window=WINDOW)
 
-
-    # For display: normalize to peak = 0 dB (visual only)
     S_clean_plot = S_db_clean - np.max(S_db_clean)
     S_noisy_plot = S_db_noisy - np.max(S_db_noisy)
 
@@ -88,7 +74,7 @@ def main():
         vmin=vmin,
         vmax=vmax,
     )
-    plt.title("Spectrogram (clean tone)")
+    plt.title("Spectrogram (clean QPSK)")
     plt.xlabel("Time (frame index)")
     plt.ylabel("Frequency (normalized)")
     plt.colorbar(label="Power [dB] (relative to peak)")
@@ -105,7 +91,7 @@ def main():
         vmin=vmin,
         vmax=vmax,
     )
-    plt.title(f"Spectrogram (tone + AWGN, SNR={SNR_DB:.1f} dB)")
+    plt.title(f"Spectrogram (QPSK + AWGN, SNR={SNR_DB:.1f} dB)")
     plt.xlabel("Time (frame index)")
     plt.ylabel("Frequency (normalized)")
     plt.colorbar(label="Power [dB] (relative to peak)")
@@ -115,3 +101,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+
