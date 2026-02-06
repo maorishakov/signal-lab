@@ -1,7 +1,7 @@
 import numpy as np
 
-
 """
+QPSK hard decison:
 I >= 0, Q >= 0 --> (0,0)
 I < 0, Q >= 0 --> (0,1)
 I < 0, Q < 0 --> (1,1)
@@ -41,5 +41,35 @@ def qpsk_demodulation(symbols: np.ndarray) -> np.ndarray:
     return bits
 
 
+"""
+BPSK hard decison:
+I >= 0 --> 0
+I < 0 --> 1
+"""
 
 
+def bpsk_demodulation(symbols: np.ndarray) -> np.ndarray:
+
+    symbols = np.asarray(symbols)
+
+    if not np.issubdtype(symbols.dtype, np.complexfloating):
+        raise ValueError("symbols must be complex number")
+
+    if symbols.ndim != 1:
+        raise ValueError("symbols must be a 1D array")
+
+    if not np.all(np.isfinite(symbols)):
+        raise ValueError("symbols contains INF or NaN values")
+
+    Inphase = symbols.real
+
+    bits_list = []
+
+    for I in Inphase:
+        if I >= 0:
+            bits_list.append(0)
+        else:
+            bits_list.append(1)
+
+    bits = np.array(bits_list, dtype=np.uint8)
+    return bits
