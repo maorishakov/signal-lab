@@ -1,8 +1,11 @@
 import pytest
 import numpy as np
 
-from signal_lab.demodulation import qpsk_demodulation
+from signal_lab.demodulation import qpsk_demodulation, bpsk_demodulation
 
+
+#-----------------------------------------------------------------------------------------------------------------------
+# QPSK TESTS:
 
 def test_qpsk_demodulation_quadrants_basic():
     symbols = np.array([1+1j, -1+1j, -1-1j, 1-1j], dtype=np.complex128)
@@ -78,3 +81,54 @@ def test_qpsk_known_demapping():
 
     expected = np.array([0,0, 0,1, 1,1, 1,0], dtype=int)
     assert np.array_equal(bits, expected)
+
+#-----------------------------------------------------------------------------------------------------------------------
+# BPSK TESTS:
+
+def test_bpsk_demodulation_basic_mapping():
+    # Expect decision on real axis:
+    # real >= 0 -> 0, real < 0 -> 1
+    symbols = np.array([1+0j, -1+0j, 2+0j, -0.1+0j], dtype=np.complex128)
+    bits = bpsk_demodulation(symbols)
+
+    expected = np.array([0, 1, 0, 1], dtype=np.uint8)
+    assert bits.dtype == np.uint8
+    assert bits.shape == (4,)
+    assert np.all(bits == expected)
+
+
+def test_bpsk_demodulation_ignores_imag_part():
+    # Imag part should not affect decision (still based on real sign)
+    symbols = np.array([1 + 5j, 1 - 9j, -1 + 3j, -2 - 0.5j], dtype=np.complex128)
+    bits = bpsk_demodulation(symbols)
+    expected = np.array([0, 0, 1, 1], dtype=np.uint8)
+    assert np.all(bits == expected)
+
+
+def test_bpsk_round_trip_with_modulation():
+    # Round-trip sanity: bits -> BPSK -> demod -> same bits
+    from signal_lab.modulation import bpsk_modulation
+
+    bits = np.array([0, 1, 1, 0, 0, 1, 0, 1], dtype=np.uint8)
+    symbols = bpsk_modulation(bits)
+    bits_hat = bpsk_demodulation(symbols)
+
+    assert np.array_equal(bits_hat, bits)
+
+
+def test_bpsk_demodulation_non_complex_raises():
+    x = np.array([1.0, -1.0, 0.5], dtype=float)
+    with pytest.raises(ValueError):
+        bpsk_demodulation(x)
+
+
+def test_bpsk_demodulation_non_1d_raises():
+    x = np.ones((10, 2), dtype=np.complex128)
+    with pytest.raises(ValueError):
+        bpsk_demodulation(x)
+
+
+def test_bpsk_demodulation_non_finite_raises():
+    x = np.array([1+0j, np.nan + 0j], dtype=np.complex128)
+    with pytest.raises(ValueError):
+        bpsk_demodulation(x)
