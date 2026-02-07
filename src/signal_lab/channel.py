@@ -48,3 +48,43 @@ def awgn_channel(symbols: np.ndarray, snr_db: float, rng: np.random.Generator = 
     y = symbols + noise
 
     return y.astype(np.complex128, copy=False)
+
+"""
+CFO - Carrier Frequency Offset
+"""
+
+def cfo_channel(iq: np.ndarray, f_cfo: float, phase0: float = 0.0) -> np.ndarray:
+
+    iq = np.asarray(iq)
+
+    if not np.issubdtype(iq.dtype, np.complexfloating):
+        raise ValueError("iq must be complex array")
+
+    if iq.ndim != 1:
+        raise ValueError("iq must be a 1D array")
+
+    if iq.size == 0:
+        raise ValueError("iq must not be empty")
+
+    if not np.all(np.isfinite(iq)):
+        raise ValueError("iq contains INF or NaN values")
+
+    f_cfo = float(f_cfo)
+    phase0 = float(phase0)
+
+    if not np.isfinite(f_cfo):
+        raise ValueError("f0 cant be inf")
+
+    if f_cfo <= -0.5 or f_cfo >= 0.5:
+        raise ValueError("f0 must be between -0.5 to 0.5")
+
+    if not np.isfinite(phase0):
+        raise ValueError("phase0 cant be inf")
+
+
+    n = np.arange(len(iq))
+    phase = 2 * np.pi * f_cfo * n + phase0
+    phase_rotation_vector = np.exp(1j * phase)
+    iq_cfo = iq * phase_rotation_vector
+
+    return iq_cfo
