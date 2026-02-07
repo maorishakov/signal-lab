@@ -73,7 +73,7 @@ def cfo_channel(iq: np.ndarray, f_cfo: float, phase0: float = 0.0) -> np.ndarray
     phase0 = float(phase0)
 
     if not np.isfinite(f_cfo):
-        raise ValueError("f0 cant be inf")
+        raise ValueError("f0 must be finite")
 
     if f_cfo <= -0.5 or f_cfo >= 0.5:
         raise ValueError("f0 must be between -0.5 to 0.5")
@@ -85,6 +85,54 @@ def cfo_channel(iq: np.ndarray, f_cfo: float, phase0: float = 0.0) -> np.ndarray
     n = np.arange(len(iq))
     phase = 2 * np.pi * f_cfo * n + phase0
     phase_rotation_vector = np.exp(1j * phase)
+
     iq_cfo = iq * phase_rotation_vector
 
     return iq_cfo
+
+"""
+Phase Noise
+
+y[n]=x[n]⋅ejϕ[n]
+ϕ[n]=ϕ[n−1]+Δϕ[n]
+Δϕ[n]∼N(0,σ^2)
+
+sigma - σ
+
+"""
+
+
+def phase_noise_channel(iq: np.ndarray, sigma: float, seed: int | None = None, rng: np.random.Generator | None = None) -> np.ndarray:
+
+    iq = np.asarray(iq)
+
+    if not np.issubdtype(iq.dtype, np.complexfloating):
+        raise ValueError("iq must be complex array")
+
+    if iq.ndim != 1:
+        raise ValueError("iq must be a 1D array")
+
+    if iq.size == 0:
+        raise ValueError("iq must not be empty")
+
+    if not np.all(np.isfinite(iq)):
+        raise ValueError("iq contains INF or NaN values")
+
+    sigma = float(sigma)
+
+    if sigma < 0:
+        raise ValueError("sigma must be >= 0")
+
+    if not np.isfinite(sigma):
+        raise ValueError("sigma must be finite")
+
+    if rng is None:
+        rng = np.random.default_rng(seed)
+
+    delta_phase = rng.normal(loc=0.0, scale=sigma, size=iq.size)
+    total_phase = np.cumsum(delta_phase)
+    rotation_vector = np.exp(1j * total_phase)
+
+    iq_phase_noise = iq * rotation_vector
+
+    return iq_phase_noise
