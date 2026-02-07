@@ -1,7 +1,7 @@
 import numpy as np
 import pytest
 
-from signal_lab.channel import awgn_channel, cfo_channel
+from signal_lab.channel import awgn_channel, cfo_channel, phase_noise_channel
 from signal_lab.analysis import power
 
 # AWGN TESTS:
@@ -140,3 +140,42 @@ def test_cfo_channel_phase0_must_be_finite():
     x = np.ones(16, dtype=np.complex128)
     with pytest.raises(ValueError):
         cfo_channel(x, f_cfo=0.1, phase0=np.inf)
+
+
+#-----------------------------------------------------------------------------------------------------------------------
+# Phase Noise tests:
+
+def test_phase_noise_identity_sigma_zero():
+    rng = np.random.default_rng(0)
+    iq = rng.normal(size=1024) + 1j * rng.normal(size=1024)
+    out = phase_noise_channel(iq, sigma=0.0, seed=123)
+    assert np.allclose(out, iq)
+
+def test_phase_noise_power_preserved():
+    rng = np.random.default_rng(1)
+    iq = rng.normal(size=4096) + 1j * rng.normal(size=4096)
+    out = phase_noise_channel(iq, sigma=0.2, seed=42)
+    # multiplicative unit-magnitude rotation -> power should stay the same
+    assert power(out) == pytest.approx(power(iq), rel=0, abs=1e-12)
+
+def test_phase_noise_reproducible_with_seed():
+    rng = np.random.default_rng(2)
+    iq = rng.normal(size=2048) + 1j * rng.normal(size=2048)
+    out1 = phase_noise_channel(iq, sigma=0.1, seed=7)
+    out2 = phase_noise_channel(iq, sigma=0.1, seed=7)
+    assert np.allclose(out1, out2)
+
+def test_phase_noise_invalid_sigma():
+    iq = np.ones(16, dtype=np.complex128)
+    with pytest.raises(ValueError):
+        phase_noise_channel(iq, sigma=-0.1)
+
+def test_phase_noise_input_validation():
+    with pytest.raises(ValueError):
+        phase_noise_channel(np.array([1.0, 2.0]), sigma=0.1)  # not complex
+
+    with pytest.raises(ValueError):
+        phase_noise_channel(np.array([], dtype=np.complex128), sigma=0.1)  # empty
+
+    with pytest.raises(ValueError):
+        phase_noise_channel(np.array([1+1j, np.nan+1j]), sigma=0.1)  # non-finite
