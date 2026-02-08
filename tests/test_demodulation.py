@@ -1,7 +1,9 @@
 import pytest
 import numpy as np
+import math
 
-from signal_lab.demodulation import qpsk_demodulation, bpsk_demodulation
+from signal_lab.demodulation import qpsk_demodulation, bpsk_demodulation, qam16_demodulation
+from signal_lab.modulation import qam16_modulation
 
 
 #-----------------------------------------------------------------------------------------------------------------------
@@ -132,3 +134,63 @@ def test_bpsk_demodulation_non_finite_raises():
     x = np.array([1+0j, np.nan + 0j], dtype=np.complex128)
     with pytest.raises(ValueError):
         bpsk_demodulation(x)
+
+
+#-----------------------------------------------------------------------------------------------------------------------
+# 16-QAM TESTS:
+
+
+def test_qam16_demodulation_known_points():
+    # Build symbols from exact constellation points (already normalized /sqrt(10))
+    symbols = np.array(
+        [
+            (-3 - 3j) / math.sqrt(10),
+            (-1 + 1j) / math.sqrt(10),
+            ( 3 - 1j) / math.sqrt(10),
+            ( 1 + 3j) / math.sqrt(10),
+        ],
+        dtype=np.complex128,
+    )
+
+    bits_hat = qam16_demodulation(symbols)
+
+    expected_bits = np.array(
+        [
+            0, 0, 0, 0,   # -3, -3
+            0, 1, 1, 1,   # -1, +1
+            1, 0, 0, 1,   # +3, -1
+            1, 1, 1, 0,   # +1, +3
+        ],
+        dtype=np.uint8,
+    )
+
+    assert np.array_equal(bits_hat, expected_bits)
+
+
+def test_qam16_demodulation_round_trip_no_noise():
+    rng = np.random.default_rng(0)
+    num_bits = 40_000  # must be multiple of 4
+    bits_tx = rng.integers(0, 2, size=num_bits, dtype=np.uint8)
+
+    symbols = qam16_modulation(bits_tx)
+    bits_rx = qam16_demodulation(symbols)
+
+    assert np.array_equal(bits_rx, bits_tx)
+
+
+def test_qam16_demodulation_non_1d_raises():
+    x = np.ones((10, 2), dtype=np.complex128)
+    with pytest.raises(ValueError):
+        qam16_demodulation(x)
+
+
+def test_qam16_demodulation_non_complex_raises():
+    x = np.ones(10, dtype=np.float64)
+    with pytest.raises(ValueError):
+        qam16_demodulation(x)
+
+
+def test_qam16_demodulation_non_finite_symbols_raises():
+    x = np.array([1 + 1j, np.nan + 1j], dtype=np.complex128)
+    with pytest.raises(ValueError):
+        qam16_demodulation(x)
