@@ -1,7 +1,7 @@
 import numpy as np
 import pytest
 
-from signal_lab.channel import awgn_channel, cfo_channel, phase_noise_channel
+from signal_lab.channel import awgn_channel, cfo_channel, phase_noise_channel, timing_offset_channel
 from signal_lab.analysis import power
 
 # AWGN TESTS:
@@ -179,3 +179,78 @@ def test_phase_noise_input_validation():
 
     with pytest.raises(ValueError):
         phase_noise_channel(np.array([1+1j, np.nan+1j]), sigma=0.1)  # non-finite
+
+
+#-----------------------------------------------------------------------------------------------------------------------
+#timing offset tests:
+
+def test_timing_offset_zero_returns_same():
+    x = np.array([1 + 1j, 2 + 2j, 3 + 3j], dtype=np.complex128)
+    y = timing_offset_channel(x, offset=0)
+    assert np.array_equal(y, x)
+
+
+def test_timing_offset_positive_delay_zeros_fill():
+    x = np.array([1 + 1j, 2 + 2j, 3 + 3j, 4 + 4j], dtype=np.complex128)
+    y = timing_offset_channel(x, offset=2, fill="zeros")
+
+    expected = np.array([0 + 0j, 0 + 0j, 1 + 1j, 2 + 2j], dtype=np.complex128)
+    assert np.array_equal(y, expected)
+
+
+def test_timing_offset_negative_advance_zeros_fill():
+    x = np.array([1 + 1j, 2 + 2j, 3 + 3j, 4 + 4j], dtype=np.complex128)
+    y = timing_offset_channel(x, offset=-2, fill="zeros")
+
+    expected = np.array([3 + 3j, 4 + 4j, 0 + 0j, 0 + 0j], dtype=np.complex128)
+    assert np.array_equal(y, expected)
+
+
+def test_timing_offset_abs_offset_ge_len_gives_all_zeros():
+    x = np.array([1 + 1j, 2 + 2j, 3 + 3j], dtype=np.complex128)
+
+    y1 = timing_offset_channel(x, offset=10, fill="zeros")
+    y2 = timing_offset_channel(x, offset=-10, fill="zeros")
+
+    assert np.array_equal(y1, np.zeros_like(x))
+    assert np.array_equal(y2, np.zeros_like(x))
+
+
+def test_timing_offset_wrap_matches_np_roll():
+    x = np.array([1 + 1j, 2 + 2j, 3 + 3j, 4 + 4j], dtype=np.complex128)
+
+    y_pos = timing_offset_channel(x, offset=1, fill="wrap")
+    y_neg = timing_offset_channel(x, offset=-2, fill="wrap")
+
+    assert np.array_equal(y_pos, np.roll(x, 1))
+    assert np.array_equal(y_neg, np.roll(x, -2))
+
+
+def test_timing_offset_non_1d_raises():
+    x = np.ones((2, 2), dtype=np.complex128)
+    with pytest.raises(ValueError):
+        timing_offset_channel(x, offset=1)
+
+
+def test_timing_offset_non_complex_raises():
+    x = np.array([1.0, 2.0, 3.0], dtype=np.float64)
+    with pytest.raises(ValueError):
+        timing_offset_channel(x, offset=1)
+
+
+def test_timing_offset_non_finite_raises():
+    x = np.array([1 + 1j, np.nan + 1j], dtype=np.complex128)
+    with pytest.raises(ValueError):
+        timing_offset_channel(x, offset=1)
+
+
+def test_timing_offset_offset_not_int_raises():
+    x = np.array([1 + 1j, 2 + 2j], dtype=np.complex128)
+    with pytest.raises(ValueError):
+        timing_offset_channel(x, offset=1.5)
+
+
+def test_timing_offset_invalid_fill_raises():
+    x = np.array([1 + 1j, 2 + 2j], dtype=np.complex128)
+    with pytest.raises(ValueError):
+        timing_offset_channel(x, offset=1, fill="banana")
