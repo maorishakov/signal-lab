@@ -136,3 +136,66 @@ def phase_noise_channel(iq: np.ndarray, sigma: float, seed: int | None = None, r
     iq_phase_noise = iq * rotation_vector
 
     return iq_phase_noise
+
+
+def timing_offset_channel(iq: np.ndarray, offset: int, fill: str = "zeros") -> np.ndarray:
+    """
+    Apply integer timing offset (sample delay/advance) to a complex IQ signal.
+
+    Parameters
+    ----------
+    offset : int
+        Timing offset in samples.
+        offset > 0 : delay (shift right)
+        offset < 0 : advance (shift left)
+    fill : str
+        How to fill missing samples. Supported:
+        - "zeros" : fill with zeros (default)
+        - "wrap"  : circular shift (non-physical, optional)
+    """
+
+    iq = np.asarray(iq)
+
+    if not np.issubdtype(iq.dtype, np.complexfloating):
+        raise ValueError("iq must be a complex array")
+
+    if iq.ndim != 1:
+        raise ValueError("iq must be a 1D array")
+
+    if iq.size == 0:
+        raise ValueError("iq must not be empty")
+
+    if not np.all(np.isfinite(iq)):
+        raise ValueError("iq contains INF or NaN values")
+
+    if not isinstance(offset, (int, np.integer)):
+        raise ValueError("offset must be an integer")
+
+    fill = str(fill).lower()
+    if fill not in {"zeros", "wrap"}:
+        raise ValueError('fill must be either "zeros" or "wrap"')
+
+    if offset == 0:
+        return iq.astype(np.complex128, copy=False)
+
+    N = iq.size
+
+    if fill == "wrap":
+        return np.roll(iq, shift=offset).astype(np.complex128, copy=False)
+
+    y = np.zeros_like(iq, dtype=np.complex128)
+
+    if offset > 0:
+        # delay: shift right
+        if offset < N:
+            y[offset:] = iq[:-offset]
+        # else: all zeros
+
+    else:
+        # advance: shift left
+        k = -offset
+        if k < N:
+            y[:-k] = iq[k:]
+        # else: all zeros
+
+    return y
